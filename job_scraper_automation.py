@@ -1,13 +1,14 @@
 # job_scraper.py
 
 import os
-import json
 import requests
 from bs4 import BeautifulSoup
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+import csv
 import smtplib
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 from datetime import datetime
 
 # --- CONFIGURATION ---
@@ -18,19 +19,13 @@ JOB_KEYWORDS = [
 ]
 
 INDUSTRIES = ['Healthcare', 'Education', 'Finance', 'Marketing', 'Film', 'Television']
-MIN_SALARY = 65000
-JOB_BOARDS = ['https://www.indeed.com/jobs?q={keyword}&l=remote']  # Example for demonstration
-GOOGLE_SHEET_NAME = 'Job Tracker'
+JOB_BOARDS = ['https://www.indeed.com/jobs?q={keyword}&l=remote']  # Example job board
+CSV_FILE_NAME = 'job_listings.csv'
 
 EMAIL_SENDER = os.environ['EMAIL_SENDER']
 EMAIL_RECEIVER = os.environ['EMAIL_SENDER']  # sending to self
 EMAIL_PASSWORD = os.environ['EMAIL_PASSWORD']
 
-# --- AUTHENTICATE GOOGLE SHEETS ---
-scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-credentials_info = json.loads(os.environ['GOOGLE_CREDENTIALS_JSON'])
-creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials_info, scope)
-client = gspread.authorize(creds)
 
 def scrape_jobs():
     jobs = []
@@ -60,31 +55,43 @@ def scrape_jobs():
                 jobs.append(job)
     return jobs
 
-def update_google_sheet(jobs):
-    sheet = client.open(GOOGLE_SHEET_NAME).sheet1
+
+def save_to_csv(jobs):
     headers = ['Organization', 'Job Title', 'Sector', 'Job type', 'Applied?', 'Location', 'On-site?', 'Job board', 'Core job responsibilities']
-    sheet.clear()
-    sheet.append_row(headers)
+    with open(CSV_FILE_NAME, mode='w', newline='', encoding='utf-8') as file:
+        writer = csv.DictWriter(file, fieldnames=headers)
+        writer.writeheader()
+        for job in jobs:
+            writer.writerow(job)
 
-    for job in jobs:
-        row = [job[h] for h in headers]
-        sheet.append_row(row)
 
-def send_summary_email(jobs):
-    subject = f"Job Scraper Summary - {datetime.now().strftime('%Y-%m-%d')}"
-    body = f"{len(jobs)} new jobs have been added to your Job Tracker sheet."
+def send_email_with_csv():
+    subject = f"Job Scraper Results - {datetime.now().strftime('%Y-%m-%d')}"
+    body = "Attached is the latest list of job opportunities."
 
-    msg = MIMEText(body)
-    msg['Subject'] = subject
+    msg = MIMEMultipart()
     msg['From'] = EMAIL_SENDER
     msg['To'] = EMAIL_RECEIVER
+    msg['Subject'] = subject
+
+    msg.attach(MIMEText(body, 'plain'))
+
+    with open(CSV_FILE_NAME, 'rb') as attachment:
+        part = MIMEBase('application', 'octet-stream')
+        part.set_payload(attachment.read())
+
+    encoders.encode_base64(part)
+    part.add_header('Content-Disposition', f'attachment; filename= {CSV_FILE_NAME}')
+
+    msg.attach(part)
 
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
         server.login(EMAIL_SENDER, EMAIL_PASSWORD)
         server.send_message(msg)
 
+
 if __name__ == '__main__':
     jobs = scrape_jobs()
-    update_google_sheet(jobs)
-    send_summary_email(jobs)
-    print(f"{len(jobs)} jobs scraped and updated.")
+    save_to_csv(jobs)
+    send_email_with_csv()
+    print(f"{len(jobs)} jobs scraped and CSV emailed.")
