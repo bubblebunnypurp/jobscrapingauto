@@ -8,7 +8,7 @@ on:
 
 jobs:
   run-job-scraper:
-    runs-on: ubuntu-latest
+      runs-on: ubuntu-latest
 
     steps:
     - name: Install dependencies
