@@ -8,22 +8,29 @@ on:
 
 jobs:
   run-job-scraper:
-      runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
 
     steps:
-    - name: Install dependencies
-    run: |
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
           pip install requests beautifulsoup4
 
-    - name: Debug: List directory contents
-    run: ls -la
+      - name: Debug: List directory contents
+        run: ls -la
 
-    - name: Debug: Show current working directory
-    run: pwd
+      - name: Debug: Show current working directory
+        run: pwd
 
-    - name: Run the job scraper
+      - name: Run the job scraper
         env:
           EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
         run: python job_scraper.py
-
