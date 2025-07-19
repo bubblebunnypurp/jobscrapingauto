@@ -26,4 +26,4 @@ jobs:
       env:
         EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
         EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-      run: python job_scraper(1).py
+      run: python job_scraper.py
